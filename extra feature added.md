@@ -88,3 +88,29 @@ This log was created on request to track extra features added in this session.
   - Isolated Vercel app: https://disasterman-scaler-demo.vercel.app — not redeployed from this session.
 - Known issues/open follow-ups:
   - No deployment/push was performed in this session because isolated-first implementation was completed locally and awaits your explicit go-ahead for publishing.
+
+### 2026-04-01 05:17:19 IST — Milestone 5: Publication to isolated targets
+- Backend changes:
+  - Published commit `6d849c8` containing the Bengaluru demo backend (`demo_models.py`, `demo_scenarios.py`, `demo_runner.py`, and `main.py` demo endpoints) to the isolated GitHub and Hugging Face remotes.
+- Frontend changes:
+  - Published the Leaflet reviewer demo frontend and Vercel proxy wiring from the isolated frontend app.
+- Deploy changes:
+  - Pushed `HEAD -> main` to isolated GitHub repo `Krishpotanwar/disasterman-scaler-demo`.
+  - Pushed `HEAD -> main` to isolated Hugging Face Space `krishpotanwar/disasterman-scaler-demo`.
+  - Deployed the isolated Vercel production app with Vercel CLI.
+  - Production deployment details:
+    - deployment id: `dpl_EJHjnigbCzk1ePnzoQgpvndyBMev`
+    - production url: `https://disasterman-scaler-demo-pjb9t2fq0-krishpotanwars-projects.vercel.app`
+    - alias: `https://disasterman-scaler-demo.vercel.app`
+- Verification performed:
+  - Hugging Face Space metadata confirmed repo SHA `6d849c8d955fb4d417afb7886a053f698bc54821` and runtime SHA matched after rollout.
+  - `https://krishpotanwar-disasterman-scaler-demo.hf.space/health` → `200`
+  - `https://krishpotanwar-disasterman-scaler-demo.hf.space/api/demo/scenarios` → `200`
+  - `https://disasterman-scaler-demo.vercel.app/` → `200`
+  - `https://disasterman-scaler-demo.vercel.app/api/demo/scenarios` → `200`
+- Current live URLs/status:
+  - Isolated GitHub repo: https://github.com/Krishpotanwar/disasterman-scaler-demo — updated on `main` with commit `6d849c8`.
+  - Isolated Hugging Face Space: https://krishpotanwar-disasterman-scaler-demo.hf.space — live and serving the demo API.
+  - Isolated Vercel app: https://disasterman-scaler-demo.vercel.app — live and proxying to the isolated HF backend.
+- Known issues/open follow-ups:
+  - Vite still reports a large bundle-size warning during production build, but the deployment completed successfully and is live.
