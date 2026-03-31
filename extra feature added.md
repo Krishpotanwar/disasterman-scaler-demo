@@ -114,3 +114,20 @@ This log was created on request to track extra features added in this session.
   - Isolated Vercel app: https://disasterman-scaler-demo.vercel.app — live and proxying to the isolated HF backend.
 - Known issues/open follow-ups:
   - Vite still reports a large bundle-size warning during production build, but the deployment completed successfully and is live.
+
+### 2026-04-01 05:17:19 IST — Milestone 6: Production API base hotfix
+- Backend changes: none.
+- Frontend changes:
+  - Fixed `frontend/src/api/client.ts` so production always uses the Vercel `/api` proxy instead of trusting `VITE_API_URL`.
+  - This prevents stale build-time env values from pointing the deployed frontend at the wrong HF Space for new demo endpoints.
+- Deploy changes:
+  - Prepared a frontend-only patch release for isolated targets after a live 404 report from the deployed app.
+- Verification performed:
+  - Local production build succeeded after the change.
+  - Verified the compiled production bundle resolves the runtime API base to `/api`.
+- Current live URLs/status:
+  - Isolated GitHub repo: https://github.com/Krishpotanwar/disasterman-scaler-demo — pending patch push from this milestone.
+  - Isolated Hugging Face Space: https://krishpotanwar-disasterman-scaler-demo.hf.space — backend unchanged by this milestone.
+  - Isolated Vercel app: https://disasterman-scaler-demo.vercel.app — pending redeploy from this milestone.
+- Known issues/open follow-ups:
+  - The old HF URL string may still appear in the minified asset as dead compile-time env text, but runtime requests now resolve through `/api`.

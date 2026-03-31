@@ -13,9 +13,10 @@ import type {
   StreamStageEvent,
 } from '../types'
 
-const rawEnvBase = import.meta.env.VITE_API_URL?.trim()
-const normalizedEnvBase = rawEnvBase ? rawEnvBase.replace(/\/+$/, '') : ''
-const BASE = normalizedEnvBase || (import.meta.env.PROD ? '/api' : 'http://localhost:7860')
+const PROD = import.meta.env.PROD
+const devEnvBase = import.meta.env.VITE_API_URL?.trim()
+const normalizedDevEnvBase = devEnvBase ? devEnvBase.replace(/\/+$/, '') : ''
+const BASE = PROD ? '/api' : normalizedDevEnvBase || 'http://localhost:7860'
 
 export class ApiError extends Error {
   status: number
@@ -58,8 +59,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export function getApiInfo() {
   return {
     base: BASE,
-    mode: normalizedEnvBase ? 'direct' : import.meta.env.PROD ? 'proxy' : 'local',
-    env: normalizedEnvBase || '(not set)',
+    mode: PROD ? 'proxy' : normalizedDevEnvBase ? 'direct' : 'local',
+    env: PROD ? '(disabled in production)' : normalizedDevEnvBase || '(not set)',
   } as const
 }
 
