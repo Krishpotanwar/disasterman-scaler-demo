@@ -218,6 +218,26 @@ See `DEPLOY_TO_HF.txt` for the full Hugging Face Spaces deployment guide.
 
 ---
 
+## Frontend (Vercel) API Connection Modes
+
+Use one of these two supported modes to avoid `{"detail":"Not Found"}` routing mismatches:
+
+1. **Proxy mode (recommended on Vercel)**
+   - Keep `VITE_API_URL` unset in Vercel.
+   - Frontend will use same-origin `/api`.
+   - `frontend/vercel.json` rewrites `/api/*` to:
+     - `https://krishpotanwar-disaster-relief-env.hf.space/*`
+
+2. **Direct mode**
+   - Set `VITE_API_URL=https://krishpotanwar-disaster-relief-env.hf.space`
+   - Frontend will call backend directly.
+
+Backend supports both canonical and compatibility routes:
+- Canonical: `/health`, `/tasks`, `/reset`, `/step`, `/simulate/{task_id}`, `/compare/{task_id}`
+- Compatibility: `/api/health`, `/api/tasks`, `/api/reset`, `/api/step`, `/api/simulate/{task_id}`, `/api/compare/{task_id}`
+
+---
+
 ## Expected Baseline Scores
 
 | Task | Score Range | Notes |

@@ -113,10 +113,32 @@ class HumanizerRequest(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
+@app.get("/")
+def root():
+    """
+    Root endpoint for deployment health visibility.
+    HF Spaces often probes '/' from the UI; returning metadata avoids 'Not Found' confusion.
+    """
+    return {
+        "name": "Disaster Relief Coordination Env (DRC-Env)",
+        "status": "ok",
+        "version": "3.0.0",
+        "docs": "/docs",
+        "health": "/health",
+        "tasks": "/tasks",
+    }
+
+
 @app.get("/health")
 def health():
     """Liveness probe. HF Spaces pings this to confirm deployment."""
     return {"status": "ok", "env": "DRC-Env v1.0", "sessions_active": len(_sessions)}
+
+
+@app.get("/api/health")
+def health_api():
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return health()
 
 
 @app.get("/tasks")
@@ -155,6 +177,12 @@ def list_tasks():
     }
 
 
+@app.get("/api/tasks")
+def list_tasks_api():
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return list_tasks()
+
+
 @app.post("/reset", response_model=ResetResponse)
 def reset(req: ResetRequest):
     """
@@ -171,6 +199,12 @@ def reset(req: ResetRequest):
     return ResetResponse(session_id=session_id, observation=obs)
 
 
+@app.post("/api/reset", response_model=ResetResponse)
+def reset_api(req: ResetRequest):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return reset(req)
+
+
 @app.post("/step", response_model=StepResult)
 def step(req: StepRequest):
     """
@@ -185,6 +219,12 @@ def step(req: StepRequest):
     return result
 
 
+@app.post("/api/step", response_model=StepResult)
+def step_api(req: StepRequest):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return step(req)
+
+
 @app.get("/state/{session_id}")
 def state(session_id: str):
     """
@@ -193,6 +233,12 @@ def state(session_id: str):
     """
     env = _get_session(session_id)
     return env.state()
+
+
+@app.get("/api/state/{session_id}")
+def state_api(session_id: str):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return state(session_id)
 
 
 @app.post("/grader", response_model=GraderResponse)
@@ -212,6 +258,12 @@ def grader(req: GraderRequest):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Grader error: {e}")
     return GraderResponse(task_id=req.task_id, score=score)
+
+
+@app.post("/api/grader", response_model=GraderResponse)
+def grader_api(req: GraderRequest):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return grader(req)
 
 
 @app.post("/baseline")
@@ -253,6 +305,12 @@ def baseline(req: BaselineRequest):
         "model": "llama-3.3-70b-versatile (all tasks)",
         "note": "Scores are reproducible at temperature=0.",
     }
+
+
+@app.post("/api/baseline")
+def baseline_api(req: BaselineRequest):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return baseline(req)
 
 
 @app.post("/humanizer")
@@ -402,6 +460,12 @@ def humanizer(req: HumanizerRequest):
     }
 
 
+@app.post("/api/humanizer")
+def humanizer_api(req: HumanizerRequest):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return humanizer(req)
+
+
 class SimulateRequest(BaseModel):
     agent: str = "greedy"   # "ai_4stage" | "greedy" | "random"
 
@@ -458,6 +522,12 @@ def simulate(task_id: str, req: SimulateRequest = SimulateRequest()):
         status_code=400,
         detail=f"Unknown agent '{agent}'. Valid: ai_4stage, greedy, random"
     )
+
+
+@app.post("/api/simulate/{task_id}")
+def simulate_api(task_id: str, req: SimulateRequest = SimulateRequest()):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return simulate(task_id, req)
 
 
 @app.post("/compare/{task_id}")
@@ -519,6 +589,12 @@ def compare(task_id: str):
         }
 
     return {"task_id": task_id, "agents": results}
+
+
+@app.post("/api/compare/{task_id}")
+def compare_api(task_id: str):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return compare(task_id)
 
 
 # ---------------------------------------------------------------------------

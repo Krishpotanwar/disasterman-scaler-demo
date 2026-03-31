@@ -5,6 +5,28 @@ Estimated time: 15–20 minutes
 Prerequisite: git, Python 3.11+, a Groq API key (free at console.groq.com)
 ================================================================
 
+FRONTEND CONNECTION COMPATIBILITY NOTE (VERCEL)
+================================================
+If your Vercel frontend shows:
+  API error 404: {"detail":"Not Found"}
+
+Use either of these modes:
+
+1) Proxy mode (recommended)
+   - Keep `VITE_API_URL` unset in Vercel.
+   - Add `frontend/vercel.json` rewrite:
+       /api/(.*)  ->  https://krishpotanwar-disaster-relief-env.hf.space/$1
+   - Frontend calls backend through same-origin `/api/*`.
+
+2) Direct mode
+   - Set `VITE_API_URL=https://krishpotanwar-disaster-relief-env.hf.space`
+   - Frontend calls HF backend directly.
+
+Backend compatibility routes are also available:
+  /api/health, /api/tasks, /api/reset, /api/step, /api/simulate/{task_id}, /api/compare/{task_id}
+
+================================================
+
 
 STEP 1 — CREATE A HUGGING FACE ACCOUNT
 ---------------------------------------

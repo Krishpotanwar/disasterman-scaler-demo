@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchTasks } from './api/client'
+import { fetchTasks, ApiError, getApiInfo } from './api/client'
 import { SimulationTab } from './components/SimulationTab'
 import { CompareTab } from './components/CompareTab'
 import type { TaskInfo } from './types'
@@ -12,6 +12,7 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState('task_1')
   const [selectedAgent, setSelectedAgent] = useState<'greedy' | 'random' | 'ai_4stage'>('greedy')
   const [tasksError, setTasksError] = useState<string | null>(null)
+  const apiInfo = getApiInfo()
 
   useEffect(() => {
     fetchTasks()
@@ -19,7 +20,13 @@ export default function App() {
         setTasks(t)
         if (t.length > 0) setSelectedTask(t[0].task_id)
       })
-      .catch(e => setTasksError(String(e)))
+      .catch(e => {
+        if (e instanceof ApiError) {
+          setTasksError(`${e.message} (url: ${e.url})`)
+          return
+        }
+        setTasksError(String(e))
+      })
   }, [])
 
   const tabClass = (t: Tab) =>
@@ -81,7 +88,9 @@ export default function App() {
           <div className="bg-red-950 border border-red-800 rounded-xl p-4 text-red-300 text-sm mb-6">
             Could not connect to backend: {tasksError}
             <br />
-            <span className="text-xs text-red-500">Make sure VITE_API_URL is set and the HF Space is running.</span>
+            <span className="text-xs text-red-500">
+              API mode: {apiInfo.mode} | base: {apiInfo.base} | VITE_API_URL: {apiInfo.env}
+            </span>
           </div>
         )}
 
