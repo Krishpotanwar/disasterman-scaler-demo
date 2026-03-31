@@ -19,7 +19,11 @@ Exit 0 = all pass, Exit 1 = failures.
 
 from __future__ import annotations
 import sys
+from fastapi.testclient import TestClient
+from demo_runner import iter_demo_events, run_demo_scenario
+from demo_scenarios import DEMO_SCENARIOS
 from environment import DisasterEnv
+from main import app
 from models import ActionModel
 from graders import grade_episode
 from reward import compute_episode_score
@@ -289,12 +293,45 @@ def test_resource_constraints():
          result5.observation.last_action_result == "insufficient_resources",
          f"got {result5.observation.last_action_result}")
 
-    # Wait action is always valid
+    # Rescue airlift also needs an available team
     env6 = DisasterEnv()
-    env6.reset("task_1")
-    result6 = env6.step(ActionModel(action="wait"))
+    env6.reset("task_2")
+    teams6 = env6.state()["teams_available"]
+    env6.step(ActionModel(action="deploy_team", to_zone="A", units=teams6))
+    airlifts_before6 = env6.state()["airlifts_remaining"]
+    result6 = env6.step(ActionModel(action="airlift", to_zone="B", type="rescue"))
+    state6 = env6.state()
+    test("rescue airlift with 0 teams returns insufficient_resources",
+         result6.observation.last_action_result == "insufficient_resources",
+         f"got {result6.observation.last_action_result}")
+    test("failed rescue airlift does not consume an airlift",
+         state6["airlifts_remaining"] == airlifts_before6,
+         f"before={airlifts_before6}, after={state6['airlifts_remaining']}")
+    test("failed rescue airlift never makes teams_available negative",
+         state6["teams_available"] >= 0,
+         f"teams_available={state6['teams_available']}")
+
+    # Supply airlift also needs remaining stock
+    env7 = DisasterEnv()
+    env7.reset("task_2")
+    stock7 = env7.state()["supply_stock"]
+    env7.step(ActionModel(action="send_supplies", to_zone="A", units=stock7))
+    airlifts_before7 = env7.state()["airlifts_remaining"]
+    result7 = env7.step(ActionModel(action="airlift", to_zone="B", type="supply"))
+    state7 = env7.state()
+    test("supply airlift with 0 stock returns insufficient_resources",
+         result7.observation.last_action_result == "insufficient_resources",
+         f"got {result7.observation.last_action_result}")
+    test("failed supply airlift does not consume an airlift",
+         state7["airlifts_remaining"] == airlifts_before7,
+         f"before={airlifts_before7}, after={state7['airlifts_remaining']}")
+
+    # Wait action is always valid
+    env8 = DisasterEnv()
+    env8.reset("task_1")
+    result8 = env8.step(ActionModel(action="wait"))
     test("wait action always returns success",
-         result6.observation.last_action_result == "success")
+         result8.observation.last_action_result == "success")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -314,6 +351,11 @@ def test_airlift_precision():
     if blocked_zones:
         bzone = blocked_zones[0]["zone_id"]
         result = env.step(ActionModel(action="airlift", to_zone=bzone, type="rescue"))
+        state_after = env.state()
+        airlift_events = [
+            e for e in state_after["event_log"]
+            if e.get("type") == "airlift" and e.get("to") == bzone
+        ]
         test("airlift to blocked zone succeeds",
              result.observation.last_action_result == "success",
              f"zone={bzone}, result={result.observation.last_action_result}")
@@ -323,15 +365,29 @@ def test_airlift_precision():
         test("airlift to blocked+critical zone yields r_airlift_precision > 0",
              result.info.get("reward_breakdown", {}).get("r_airlift_precision", 0.0) > 0.0,
              str(result.info.get("reward_breakdown", {})))
+        test("event_log records airlift events with stable type='airlift'",
+             len(airlift_events) == 1,
+             str(state_after["event_log"]))
+        test("event_log stores airlift mode separately",
+             airlift_events[0].get("airlift_type") == "rescue" if airlift_events else False,
+             str(airlift_events))
 
-    # Airlift supply type works
+    # Airlift supply type works and cannot create stock from nothing
     env2 = DisasterEnv()
     env2.reset("task_2")
+    stock2 = env2.state()["supply_stock"]
+    env2.step(ActionModel(action="send_supplies", to_zone="A", units=stock2 - 10))
     blocked2 = [z for z in env2.state()["zones"] if z["road_blocked"]]
     if blocked2:
-        result2 = env2.step(ActionModel(action="airlift", to_zone=blocked2[0]["zone_id"], type="supply"))
+        bzone2 = blocked2[0]["zone_id"]
+        result2 = env2.step(ActionModel(action="airlift", to_zone=bzone2, type="supply"))
+        state2 = env2.state()
+        zone2 = next(z for z in state2["zones"] if z["zone_id"] == bzone2)
         test("airlift supply type succeeds on blocked zone",
              result2.observation.last_action_result == "success")
+        test("supply airlift only delivers remaining stock",
+             zone2["supply_received"] == 10 and state2["supply_stock"] == 0,
+             f"received={zone2['supply_received']}, stock={state2['supply_stock']}")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -597,6 +653,80 @@ def test_transit_delay():
 
 
 # ──────────────────────────────────────────────────────────────
+# GROUP 13: Bengaluru Live Demo
+# ──────────────────────────────────────────────────────────────
+
+def test_live_demo_mode():
+    section("GROUP 13 — Bengaluru Live Demo Mode")
+
+    expected_ids = {
+        "bellandur_flood_response",
+        "peenya_industrial_fire",
+        "whitefield_building_collapse",
+    }
+
+    test("demo scenario registry contains exactly 3 scenarios",
+         len(DEMO_SCENARIOS) == 3,
+         f"got {sorted(DEMO_SCENARIOS.keys())}")
+    test("demo scenario registry IDs match curated Bengaluru set",
+         set(DEMO_SCENARIOS.keys()) == expected_ids,
+         f"got {sorted(DEMO_SCENARIOS.keys())}")
+
+    client = TestClient(app)
+
+    catalog = client.get("/demo/scenarios")
+    test("GET /demo/scenarios returns 200", catalog.status_code == 200, catalog.text)
+    catalog_body = catalog.json()
+    scenarios = catalog_body.get("scenarios", [])
+    test("GET /demo/scenarios returns 3 scenario summaries",
+         len(scenarios) == 3,
+         f"got {len(scenarios)}")
+    test("GET /demo/scenarios exposes available agents",
+         set(catalog_body.get("available_agents", [])) == {"ai_4stage", "greedy", "random"},
+         str(catalog_body))
+
+    bad_run = client.post("/demo/run/not_real", json={"agent": "greedy"})
+    test("POST /demo/run rejects unknown scenario IDs",
+         bad_run.status_code == 400,
+         bad_run.text)
+
+    replay = client.post("/demo/run/bellandur_flood_response", json={"agent": "greedy"})
+    test("POST /demo/run returns 200 for valid scenario",
+         replay.status_code == 200,
+         replay.text)
+    replay_body = replay.json()
+    test("demo replay payload includes scenario detail",
+         replay_body.get("scenario", {}).get("scenario_id") == "bellandur_flood_response",
+         str(replay_body.keys()))
+    test("demo replay includes map_state on each step",
+         all("map_state" in step for step in replay_body.get("steps", [])),
+         str(replay_body.get("steps", [])[:1]))
+    test("demo replay map_state includes resource positions and route references",
+         all(
+             "resource_positions" in step["map_state"] and "recent_movements" in step["map_state"]
+             for step in replay_body.get("steps", [])
+         ),
+         str(replay_body.get("steps", [])[:1]))
+
+    events = [event for event, _ in iter_demo_events("bellandur_flood_response", "greedy", delay_seconds=0.0)]
+    test("demo SSE generator emits meta first",
+         bool(events) and events[0] == "meta",
+         str(events[:6]))
+    test("demo SSE generator emits ordered stage/step/done events",
+         events[-1] == "done" and "step" in events and events.count("stage") >= 4,
+         str(events[:10]))
+
+    for agent in ["ai_4stage", "greedy", "random"]:
+        result = run_demo_scenario("whitefield_building_collapse", agent)
+        test(f"demo runner works for agent={agent}",
+             result.steps_taken == len(result.steps) and len(result.steps) > 0,
+             f"steps_taken={result.steps_taken}, len={len(result.steps)}")
+        test(f"demo runner keeps map_state schema stable for agent={agent}",
+             all(step.map_state.recent_movements is not None for step in result.steps),
+             str(result.steps[0].map_state.model_dump()))
+
+
+# ──────────────────────────────────────────────────────────────
 # MAIN
 # ──────────────────────────────────────────────────────────────
 
@@ -617,6 +747,7 @@ def run_all_tests():
     test_pytorch_zone_scorer()
     test_session_isolation()
     test_transit_delay()
+    test_live_demo_mode()
 
     # ── Final summary ──────────────────────────────────────────
     passed = sum(1 for _, ok, _ in _results if ok)

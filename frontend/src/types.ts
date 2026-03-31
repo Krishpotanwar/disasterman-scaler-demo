@@ -1,3 +1,5 @@
+export type AgentId = 'greedy' | 'random' | 'ai_4stage'
+
 export interface ZoneObs {
   zone_id: string
   casualties_remaining: number
@@ -144,4 +146,133 @@ export interface StreamDoneEvent {
   final_score: number
   cumulative_reward: number
   steps_taken: number
+}
+
+export interface DemoScenarioSummary {
+  scenario_id: string
+  title: string
+  disaster_type: string
+  narrative: string
+  duration_steps: number
+  default_agent: AgentId
+  tags: string[]
+  center: [number, number]
+  zoom: number
+}
+
+export interface DemoLocation {
+  node_id: string
+  label: string
+  area: string
+  coordinates: [number, number]
+  kind: 'hq' | 'incident' | 'support' | 'false_alert' | 'medical' | 'staging'
+  description: string
+  zone_id?: string | null
+}
+
+export interface DemoRoute {
+  route_id: string
+  label: string
+  mode: 'road' | 'air'
+  from_node: string
+  to_node: string
+  path: [number, number][]
+  zone_id?: string | null
+}
+
+export interface DemoMapOverlay {
+  overlay_id: string
+  label: string
+  kind: 'flood_zone' | 'fire_zone' | 'collapse_zone' | 'blocked_corridor' | 'false_alert' | 'support_zone'
+  geometry: 'polygon' | 'polyline' | 'circle'
+  coordinates: [number, number][]
+  radius_m?: number | null
+  severity: 'low' | 'medium' | 'high'
+  active: boolean
+  note: string
+  zone_id?: string | null
+}
+
+export interface DemoScenarioDetail extends DemoScenarioSummary {
+  bounds: [number, number][]
+  hq_node_id: string
+  allowed_agents: AgentId[]
+  locations: DemoLocation[]
+  routes: DemoRoute[]
+  overlays: DemoMapOverlay[]
+}
+
+export interface DemoResourcePosition {
+  resource_id: string
+  kind: 'hq' | 'team' | 'supply' | 'airlift'
+  label: string
+  coordinates: [number, number]
+  count: number
+  status: 'ready' | 'deployed' | 'support' | 'airborne'
+  assigned_zone?: string | null
+  note: string
+}
+
+export interface DemoResourceMovement {
+  movement_id: string
+  kind: 'team' | 'supply' | 'airlift'
+  label: string
+  route_id: string
+  path: [number, number][]
+  from_node: string
+  to_node: string
+  units: number
+  progress: number
+  color: string
+  action: string
+  note: string
+}
+
+export interface DemoMapState {
+  center: [number, number]
+  zoom: number
+  bounds: [number, number][]
+  overlays: DemoMapOverlay[]
+  resource_positions: DemoResourcePosition[]
+  recent_movements: DemoResourceMovement[]
+  action_target?: string | null
+  step_label: string
+}
+
+export interface DemoStep extends SimStep {
+  map_state: DemoMapState
+}
+
+export interface DemoRunResult {
+  scenario: DemoScenarioDetail
+  agent: string
+  model?: string | null
+  final_score: number | null
+  cumulative_reward: number
+  steps_taken: number
+  steps: DemoStep[]
+  note?: string | null
+}
+
+export interface DemoStreamMetaEvent {
+  scenario: DemoScenarioDetail
+  scenario_id: string
+  agent: AgentId
+  model: string
+}
+
+export interface DemoStreamDoneEvent {
+  scenario_id: string
+  agent: AgentId
+  model?: string
+  final_score: number
+  cumulative_reward: number
+  steps_taken: number
+  note?: string | null
+}
+
+export interface DemoScenarioCatalog {
+  scenarios: DemoScenarioSummary[]
+  available_agents: AgentId[]
+  ai_available: boolean
 }

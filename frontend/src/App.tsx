@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { fetchTasks, ApiError, getApiInfo } from './api/client'
 import { SimulationTab } from './components/SimulationTab'
 import { CompareTab } from './components/CompareTab'
+import { LiveDemoTab } from './components/LiveDemoTab'
 import type { TaskInfo } from './types'
 
-type Tab = 'simulate' | 'compare' | 'about'
+type Tab = 'simulate' | 'demo' | 'compare' | 'about'
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('simulate')
@@ -45,12 +46,12 @@ export default function App() {
             <span className="text-2xl">🚨</span>
             <div>
               <h1 className="text-lg font-bold leading-tight">DisasterMan</h1>
-              <p className="text-xs text-zinc-500">AI Disaster Relief Coordination — Multi-Agent RL Environment</p>
+              <p className="text-xs text-zinc-500">AI Disaster Relief Coordination — Benchmark + Bengaluru Live Demo</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <a
-              href="https://github.com/Rajy777/disasterman"
+              href="https://github.com/Krishpotanwar/disasterman-scaler-demo"
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-zinc-500 hover:text-white transition-colors px-3 py-1.5 border border-zinc-800 rounded-lg"
@@ -58,7 +59,7 @@ export default function App() {
               GitHub ↗
             </a>
             <a
-              href="https://krishpotanwar-disaster-relief-env.hf.space/docs"
+              href="https://krishpotanwar-disasterman-scaler-demo.hf.space/docs"
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs bg-zinc-800 hover:bg-zinc-700 text-white transition-colors px-3 py-1.5 rounded-lg"
@@ -72,6 +73,9 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 pb-3 flex gap-1">
           <button className={tabClass('simulate')} onClick={() => setTab('simulate')}>
             🎮 Simulate
+          </button>
+          <button className={tabClass('demo')} onClick={() => setTab('demo')}>
+            🗺️ Live Demo
           </button>
           <button className={tabClass('compare')} onClick={() => setTab('compare')}>
             ⚔️ Compare Agents
@@ -104,6 +108,10 @@ export default function App() {
           />
         )}
 
+        {tab === 'demo' && (
+          <LiveDemoTab />
+        )}
+
         {tab === 'compare' && tasks.length > 0 && (
           <CompareTab tasks={tasks} />
         )}
@@ -121,9 +129,9 @@ export default function App() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
-                { title: '98/98 Tests', sub: 'Passing — full OpenEnv compliance', icon: '✅' },
+                { title: '106/106 Tests', sub: 'Passing — benchmark environment verified', icon: '✅' },
                 { title: 'PyTorch MLP', sub: 'Zone priority scoring <1ms', icon: '🧠' },
-                { title: '4-Stage Pipeline', sub: 'Scorer → Triage → Planner → Action', icon: '⚙️' },
+                { title: 'Live City Demo', sub: 'Leaflet + SSE scenario theater', icon: '🗺️' },
               ].map(c => (
                 <div key={c.title} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
                   <div className="text-3xl mb-2">{c.icon}</div>
@@ -139,7 +147,7 @@ export default function App() {
                 <p><strong className="text-white">False SOS Signals</strong> — Zones H, I, J broadcast genuine-looking distress calls with zero casualties. The AI must detect and ignore them using pattern recognition — not explicit flags.</p>
                 <p><strong className="text-white">Cascading Failures</strong> — A dam breaks at step 7 of Task 3, adding 60 new casualties. The agent must dynamically replan mid-episode.</p>
                 <p><strong className="text-white">Anti-Hallucination Validator</strong> — Every LLM action passes through a hard constraint checker that rejects invalid zones, overestimates, and blocked-road violations before execution.</p>
-                <p><strong className="text-white">Real Scores</strong> — Every number on this dashboard is real API data. No Math.random(). No fake delays.</p>
+                <p><strong className="text-white">Bengaluru Live Demo</strong> — Separate reviewer mode shows curated flood, fire, and collapse scenarios on a real map with live resource routes and synchronized reasoning.</p>
               </div>
             </div>
           </div>

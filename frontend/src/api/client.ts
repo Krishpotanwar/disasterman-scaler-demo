@@ -1,4 +1,9 @@
 import type {
+  AgentId,
+  DemoRunResult,
+  DemoScenarioCatalog,
+  DemoStreamDoneEvent,
+  DemoStreamMetaEvent,
   SimResult,
   CompareResult,
   TaskInfo,
@@ -65,7 +70,7 @@ export async function fetchTasks(): Promise<TaskInfo[]> {
 
 export async function simulate(
   taskId: string,
-  agent: 'greedy' | 'random' | 'ai_4stage' = 'greedy',
+  agent: AgentId = 'greedy',
 ): Promise<SimResult> {
   return request<SimResult>(`/simulate/${taskId}`, {
     method: 'POST',
@@ -86,27 +91,59 @@ type StreamCallbacks = {
   onError: (message: string) => void
 }
 
-export function buildSseUrl(taskId: string, agent: 'greedy' | 'random' | 'ai_4stage'): string {
-  const streamPath = `/simulate/stream/${taskId}?agent=${encodeURIComponent(agent)}`
+function buildEventSourceUrl(path: string): string {
   if (BASE.startsWith('http://') || BASE.startsWith('https://')) {
-    return `${BASE}${streamPath}`
+    return `${BASE}${path}`
   }
   if (typeof window !== 'undefined') {
-    return `${window.location.origin}${BASE}${streamPath}`
+    return `${window.location.origin}${BASE}${path}`
   }
-  return `${BASE}${streamPath}`
+  return `${BASE}${path}`
 }
 
-export function streamSimulation(
-  taskId: string,
-  agent: 'greedy' | 'random' | 'ai_4stage',
-  callbacks: StreamCallbacks,
+export function buildSseUrl(taskId: string, agent: AgentId): string {
+  const streamPath = `/simulate/stream/${taskId}?agent=${encodeURIComponent(agent)}`
+  return buildEventSourceUrl(streamPath)
+}
+
+export async function fetchDemoScenarios(): Promise<DemoScenarioCatalog> {
+  return request<DemoScenarioCatalog>('/demo/scenarios')
+}
+
+export async function runDemoScenario(
+  scenarioId: string,
+  agent: AgentId = 'ai_4stage',
+): Promise<DemoRunResult> {
+  return request<DemoRunResult>(`/demo/run/${scenarioId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent }),
+  })
+}
+
+type DemoStreamCallbacks = {
+  onMeta: (event: DemoStreamMetaEvent) => void
+  onStage: (event: StreamStageEvent) => void
+  onStep: (step: DemoRunResult['steps'][number]) => void
+  onDone: (event: DemoStreamDoneEvent) => void
+  onError: (message: string) => void
+}
+
+export function buildDemoSseUrl(scenarioId: string, agent: AgentId): string {
+  const streamPath = `/demo/stream/${scenarioId}?agent=${encodeURIComponent(agent)}`
+  return buildEventSourceUrl(streamPath)
+}
+
+export function streamDemoScenario(
+  scenarioId: string,
+  agent: AgentId,
+  callbacks: DemoStreamCallbacks,
 ): () => void {
-  const url = buildSseUrl(taskId, agent)
+  const url = buildDemoSseUrl(scenarioId, agent)
   const source = new EventSource(url)
 
   source.addEventListener('meta', (event) => {
-    const data = JSON.parse((event as MessageEvent).data) as StreamMetaEvent
+    const data = JSON.parse((event as MessageEvent).data) as DemoStreamMetaEvent
     callbacks.onMeta(data)
   })
 
@@ -116,12 +153,12 @@ export function streamSimulation(
   })
 
   source.addEventListener('step', (event) => {
-    const data = JSON.parse((event as MessageEvent).data) as SimStep
+    const data = JSON.parse((event as MessageEvent).data) as DemoRunResult['steps'][number]
     callbacks.onStep(data)
   })
 
   source.addEventListener('done', (event) => {
-    const data = JSON.parse((event as MessageEvent).data) as StreamDoneEvent
+    const data = JSON.parse((event as MessageEvent).data) as DemoStreamDoneEvent
     callbacks.onDone(data)
     source.close()
   })
@@ -141,5 +178,52 @@ export function streamSimulation(
     source.close()
   })
 
+  return () => source.close()
+}
+
+export function streamSimulation(
+  taskId: string,
+  agent: AgentId,
+  callbacks: StreamCallbacks,
+): () => void {
+  const url = buildSseUrl(taskId, agent)
+  const source = new EventSource(url)
+ 
+  source.addEventListener('meta', (event) => {
+    const data = JSON.parse((event as MessageEvent).data) as StreamMetaEvent
+    callbacks.onMeta(data)
+  })
+ 
+  source.addEventListener('stage', (event) => {
+    const data = JSON.parse((event as MessageEvent).data) as StreamStageEvent
+    callbacks.onStage(data)
+  })
+ 
+  source.addEventListener('step', (event) => {
+    const data = JSON.parse((event as MessageEvent).data) as SimStep
+    callbacks.onStep(data)
+  })
+ 
+  source.addEventListener('done', (event) => {
+    const data = JSON.parse((event as MessageEvent).data) as StreamDoneEvent
+    callbacks.onDone(data)
+    source.close()
+  })
+ 
+  source.addEventListener('error', (event) => {
+    const payload = (event as MessageEvent).data
+    if (payload) {
+      try {
+        const parsed = JSON.parse(payload) as { detail?: string }
+        callbacks.onError(parsed.detail || payload)
+      } catch {
+        callbacks.onError(payload)
+      }
+    } else {
+      callbacks.onError(`SSE stream failed (${url})`)
+    }
+    source.close()
+  })
+ 
   return () => source.close()
 }

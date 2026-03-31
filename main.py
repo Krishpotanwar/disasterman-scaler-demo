@@ -27,6 +27,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from demo_models import DemoRunRequest
+from demo_runner import iter_demo_events, list_demo_agents, run_demo_scenario, validate_demo_agent
+from demo_scenarios import get_demo_scenario_detail, list_demo_scenario_summaries
 from environment import DisasterEnv
 from models import ActionModel, ObservationModel, StepResult
 from graders import grade_episode
@@ -469,6 +472,89 @@ def humanizer_api(req: HumanizerRequest):
     return humanizer(req)
 
 
+@app.get("/demo/scenarios")
+def demo_scenarios():
+    """Return the reviewer-facing Bengaluru live demo scenario catalog."""
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    return {
+        "scenarios": [scenario.model_dump() for scenario in list_demo_scenario_summaries()],
+        "available_agents": list_demo_agents(),
+        "ai_available": bool(groq_key or openai_key),
+    }
+
+
+@app.get("/api/demo/scenarios")
+def demo_scenarios_api():
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return demo_scenarios()
+
+
+@app.post("/demo/run/{scenario_id}")
+def demo_run(scenario_id: str, req: DemoRunRequest = DemoRunRequest()):
+    """Run a full Bengaluru live demo replay for the chosen scenario."""
+    try:
+        get_demo_scenario_detail(scenario_id)
+        agent = validate_demo_agent(req.agent)
+        return run_demo_scenario(scenario_id, agent).model_dump()
+    except KeyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/demo/run/{scenario_id}")
+def demo_run_api(scenario_id: str, req: DemoRunRequest = DemoRunRequest()):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return demo_run(scenario_id, req)
+
+
+@app.get("/demo/stream/{scenario_id}")
+def demo_stream(scenario_id: str, agent: str = "ai_4stage"):
+    """
+    Stream the Bengaluru reviewer demo over SSE.
+
+    Events mirror the benchmark simulator stream:
+      - meta
+      - stage
+      - step
+      - done
+      - error
+    """
+    try:
+        get_demo_scenario_detail(scenario_id)
+        agent_name = validate_demo_agent(agent)
+    except KeyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    def _event_generator():
+        try:
+            for event, payload in iter_demo_events(scenario_id, agent_name, delay_seconds=0.45):
+                yield _sse(event, payload)
+        except Exception as exc:
+            yield _sse("error", {"scenario_id": scenario_id, "agent": agent_name, "detail": str(exc)})
+
+    return StreamingResponse(
+        _event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/api/demo/stream/{scenario_id}")
+def demo_stream_api(scenario_id: str, agent: str = "ai_4stage"):
+    """Compatibility alias for deployments that proxy API calls under /api."""
+    return demo_stream(scenario_id, agent)
+
+
 class SimulateRequest(BaseModel):
     agent: str = "greedy"   # "ai_4stage" | "greedy" | "random"
 
@@ -584,8 +670,8 @@ def _stream_heuristic(task_id: str, agent: str):
         else:
             action_model = get_random_action(obs_dict)
             rationale = (
-                f"Random policy picked action={action_model.action}"
-                f"{' to ' + str(action_model.to_zone) if action_model.to_zone else ''}"
+                f"Randomly chose: {action_model.action}"
+                + (f" → zone {action_model.to_zone or action_model.from_zone}" if (action_model.to_zone or action_model.from_zone) else "")
             )
             plan_decision = "Random valid-action policy"
 
