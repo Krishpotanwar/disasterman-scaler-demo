@@ -217,6 +217,85 @@ def print_summary(results: dict) -> None:
     print("=" * 65)
 
 
+def run_task_detailed(task_id: str) -> dict:
+    """
+    Run one full episode using the 4-stage pipeline, capturing per-step reasoning.
+
+    Returns dict with:
+        task_id, agent, final_score, cumulative_reward, steps_taken, steps: [...]
+
+    Each step contains: step, observation, action, reward, reasoning{pytorch_scores,
+    triage_summary, plan_decision, action_rationale}
+    """
+    client, MODEL = _build_client()
+
+    env = DisasterEnv()
+    obs = env.reset(task_id)
+    history: list[dict] = []
+    total_reward = 0.0
+    steps_data: list[dict] = []
+
+    while True:
+        obs_dict = obs.model_dump()
+
+        zone_scores = score_zones(obs_dict)
+        triage = run_triage(obs_dict, client, MODEL, zone_scores=zone_scores)
+        plan = run_planner(obs_dict, triage, zone_scores, client)
+        action = get_action(
+            obs_dict, triage, history, client, MODEL,
+            zone_scores=zone_scores,
+            plan=plan,
+        )
+
+        result = env.step(action)
+        total_reward += result.reward
+
+        # Build human-readable summaries for frontend display
+        triage_summary = (
+            f"Priority zones: {[p['zone_id'] for p in triage.get('priority_zones', [])[:3]]} | "
+            f"False SOS suspects: {triage.get('false_sos_suspects', [])} | "
+            f"Deadline alerts: {[d['zone_id'] for d in triage.get('deadline_alerts', [])]}"
+        )
+        plan_decision = plan.get("critical_decision", "")
+        step_plan = plan.get("step_plan", [])
+        step1 = next((s for s in step_plan if s.get("step_offset") == 1), None)
+        action_rationale = (
+            step1.get("reason", f"Execute {action.action}") if step1
+            else f"Fallback: {action.action}"
+        )
+
+        steps_data.append({
+            "step": obs_dict["step_number"],
+            "observation": obs_dict,
+            "action": action.model_dump(),
+            "reward": round(result.reward, 4),
+            "reasoning": {
+                "pytorch_scores": zone_scores,
+                "triage_summary": triage_summary,
+                "plan_decision": plan_decision,
+                "action_rationale": action_rationale,
+            },
+        })
+
+        obs = result.observation
+        if result.done:
+            break
+
+        time.sleep(STEP_DELAY)
+
+    final_state = env.state()
+    score = grade_episode(final_state["event_log"], final_state, task_id)
+
+    return {
+        "task_id": task_id,
+        "agent": "ai_4stage",
+        "final_score": round(score, 4),
+        "cumulative_reward": round(total_reward, 4),
+        "steps_taken": len(steps_data),
+        "steps": steps_data,
+    }
+
+
 if __name__ == "__main__":
     results = run_all_parallel()
     print_summary(results)

@@ -402,6 +402,125 @@ def humanizer(req: HumanizerRequest):
     }
 
 
+class SimulateRequest(BaseModel):
+    agent: str = "greedy"   # "ai_4stage" | "greedy" | "random"
+
+
+@app.post("/simulate/{task_id}")
+def simulate(task_id: str, req: SimulateRequest = SimulateRequest()):
+    """
+    Run a full episode and return all steps with per-step reasoning.
+
+    agent=ai_4stage  — PyTorch + Triage + Planner + Action (requires GROQ_API_KEY)
+    agent=greedy     — Deterministic greedy heuristic (no API key needed, fast)
+    agent=random     — Random valid actions (no API key needed, fast)
+
+    Returns: {task_id, agent, final_score, cumulative_reward, steps_taken, steps:[...]}
+    Each step: {step, observation, action, reward, reasoning{pytorch_scores, triage_summary, plan_decision, action_rationale}}
+    """
+    if task_id not in ALL_TASKS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown task_id '{task_id}'. Valid: {list(ALL_TASKS.keys())}"
+        )
+
+    agent = req.agent
+
+    if agent == "ai_4stage":
+        groq_key = os.environ.get("GROQ_API_KEY", "")
+        openai_key = os.environ.get("OPENAI_API_KEY", "")
+        if not groq_key and not openai_key:
+            raise HTTPException(
+                status_code=503,
+                detail="agent=ai_4stage requires GROQ_API_KEY or OPENAI_API_KEY. Use agent=greedy for a fast no-key demo."
+            )
+        try:
+            from inference_v2 import run_task_detailed
+            return run_task_detailed(task_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if agent == "greedy":
+        try:
+            from agents.greedy_agent import run_greedy_task
+            return run_greedy_task(task_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    if agent == "random":
+        try:
+            from agents.random_agent import run_random_task
+            return run_random_task(task_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Unknown agent '{agent}'. Valid: ai_4stage, greedy, random"
+    )
+
+
+@app.post("/compare/{task_id}")
+def compare(task_id: str):
+    """
+    Run all three agents on the same task and return side-by-side comparison.
+
+    Runs random + greedy synchronously (no API key needed, fast).
+    Runs ai_4stage only if GROQ_API_KEY or OPENAI_API_KEY is set.
+
+    Returns: {task_id, agents: {random: {...}, greedy: {...}, ai_4stage: {...}}}
+    """
+    if task_id not in ALL_TASKS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown task_id '{task_id}'. Valid: {list(ALL_TASKS.keys())}"
+        )
+
+    import concurrent.futures
+    from agents.random_agent import run_random_task
+    from agents.greedy_agent import run_greedy_task
+
+    results: dict = {}
+
+    def _run_random():
+        return ("random", run_random_task(task_id))
+
+    def _run_greedy():
+        return ("greedy", run_greedy_task(task_id))
+
+    def _run_ai():
+        from inference_v2 import run_task_detailed
+        return ("ai_4stage", run_task_detailed(task_id))
+
+    tasks_to_run = [_run_random, _run_greedy]
+    groq_key = os.environ.get("GROQ_API_KEY", "")
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    has_ai = bool(groq_key or openai_key)
+
+    if has_ai:
+        tasks_to_run.append(_run_ai)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks_to_run)) as executor:
+        futures = [executor.submit(fn) for fn in tasks_to_run]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                agent_name, data = future.result()
+                results[agent_name] = data
+            except Exception as exc:
+                results["error"] = str(exc)
+
+    if not has_ai:
+        results["ai_4stage"] = {
+            "task_id": task_id,
+            "agent": "ai_4stage",
+            "final_score": None,
+            "note": "Set GROQ_API_KEY to enable 4-stage AI agent",
+            "steps": [],
+        }
+
+    return {"task_id": task_id, "agents": results}
+
+
 # ---------------------------------------------------------------------------
 # HF Spaces entry point
 # ---------------------------------------------------------------------------
