@@ -131,3 +131,20 @@ This log was created on request to track extra features added in this session.
   - Isolated Vercel app: https://disasterman-scaler-demo.vercel.app — pending redeploy from this milestone.
 - Known issues/open follow-ups:
   - The old HF URL string may still appear in the minified asset as dead compile-time env text, but runtime requests now resolve through `/api`.
+
+### 2026-04-01 05:32:41 IST — Milestone 7: Replay controls and map legend polish
+- Backend changes: none.
+- Frontend changes:
+  - Added explicit `Prev` and `Next` replay step buttons to `frontend/src/components/LiveDemoTab.tsx` so reviewers can move through the simulation one step at a time without using only the scrubber.
+  - Clarified the map legend in `frontend/src/components/LeafletDemoMap.tsx` by adding `Support hub`, `Medical node`, and `False alert` entries.
+  - Tuned location colors so support hubs and medical nodes are visually distinct instead of both reading as generic green markers.
+- Deploy changes:
+  - Prepared a frontend-only patch release for the isolated Vercel app.
+- Verification performed:
+  - `npm run build` → passed
+- Current live URLs/status:
+  - Isolated GitHub repo: https://github.com/Krishpotanwar/disasterman-scaler-demo — pending patch push from this milestone.
+  - Isolated Hugging Face Space: https://krishpotanwar-disasterman-scaler-demo.hf.space — backend unchanged by this milestone.
+  - Isolated Vercel app: https://disasterman-scaler-demo.vercel.app — pending redeploy from this milestone.
+- Known issues/open follow-ups:
+  - Vite still reports the existing large bundle-size warning, but the frontend build succeeds.

@@ -66,8 +66,8 @@ function overlayFillOpacity(overlay: DemoMapOverlay): number {
 function locationStyle(location: DemoLocation) {
   if (location.kind === 'hq') return { color: '#f8fafc', radius: 8, fillOpacity: 0.9 }
   if (location.kind === 'false_alert') return { color: '#71717a', radius: 6, fillOpacity: 0.65 }
-  if (location.kind === 'medical') return { color: '#22c55e', radius: 6, fillOpacity: 0.8 }
-  if (location.kind === 'support') return { color: '#10b981', radius: 6, fillOpacity: 0.8 }
+  if (location.kind === 'medical') return { color: '#84cc16', radius: 6, fillOpacity: 0.86 }
+  if (location.kind === 'support') return { color: '#10b981', radius: 6, fillOpacity: 0.84 }
   return { color: '#fb7185', radius: 7, fillOpacity: 0.82 }
 }
 
@@ -382,6 +382,9 @@ export function LeafletDemoMap({ scenario, mapState }: Props) {
         {[
           { label: 'HQ / control', color: '#e2e8f0' },
           { label: 'Incident node', color: '#fb7185' },
+          { label: 'Support hub', color: '#10b981' },
+          { label: 'Medical node', color: '#84cc16' },
+          { label: 'False alert', color: '#71717a' },
           { label: 'Relief stock', color: '#f97316' },
           { label: 'Rescue teams', color: '#38bdf8' },
           { label: 'Airlift', color: '#c084fc' },

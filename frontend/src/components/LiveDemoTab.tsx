@@ -323,6 +323,8 @@ export function LiveDemoTab() {
   const currentStageEvents = currentStep ? stageTimeline[currentStep.step] ?? [] : []
   const scoreResult = currentResult ? toScoreResult(currentResult, selectedScenarioId || 'demo') : null
   const canReplay = Boolean(currentResult && currentResult.steps.length > 0)
+  const atFirstStep = !currentResult || currentStepIndex <= 0
+  const atLastStep = !currentResult || currentStepIndex >= currentResult.steps.length - 1
 
   return (
     <div className="space-y-6">
@@ -443,6 +445,28 @@ export function LiveDemoTab() {
                   className="rounded-xl bg-zinc-800 px-3 py-2 text-sm text-white transition-colors hover:bg-zinc-700"
                 >
                   {isPlaying ? '⏸ Pause' : '▷ Replay'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopPlayback()
+                    setCurrentStepIndex((index) => Math.max(0, index - 1))
+                  }}
+                  disabled={atFirstStep}
+                  className="rounded-xl bg-zinc-800 px-3 py-2 text-sm text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ← Prev
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopPlayback()
+                    setCurrentStepIndex((index) => Math.min(currentResult.steps.length - 1, index + 1))
+                  }}
+                  disabled={atLastStep}
+                  className="rounded-xl bg-zinc-800 px-3 py-2 text-sm text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next →
                 </button>
                 <button
                   type="button"
