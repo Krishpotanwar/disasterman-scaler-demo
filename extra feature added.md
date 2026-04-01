@@ -167,3 +167,26 @@ This log was created on request to track extra features added in this session.
   - Isolated Vercel app: https://disasterman-scaler-demo.vercel.app — pending redeploy from this milestone.
 - Known issues/open follow-ups:
   - The isolated benchmark backend still does not have `GROQ_API_KEY` or `OPENAI_API_KEY`, so `ai_4stage` benchmark runs correctly remain unavailable there; this milestone only improves the reviewer-facing error/fallback behavior.
+
+### 2026-04-01 05:54:34 IST — Milestone 9: Published benchmark SSE fallback patch
+- Backend changes: none.
+- Frontend changes:
+  - Published commit `25cb1e0` containing the benchmark SSE fallback patch and clearer benchmark replay error handling.
+- Deploy changes:
+  - Pushed `HEAD -> main` to isolated GitHub repo `Krishpotanwar/disasterman-scaler-demo`.
+  - Pushed `HEAD -> main` to isolated Hugging Face Space `krishpotanwar/disasterman-scaler-demo`.
+  - Redeployed the isolated Vercel production app with Vercel CLI.
+  - Production deployment details:
+    - deployment id: `dpl_J824vzxhiU1TvfZ2pzuxiTLgaUe7`
+    - production url: `https://disasterman-scaler-demo-8dad7168d-krishpotanwars-projects.vercel.app`
+    - alias: `https://disasterman-scaler-demo.vercel.app`
+- Verification performed:
+  - `https://disasterman-scaler-demo.vercel.app/` → `200`
+  - `https://disasterman-scaler-demo.vercel.app/api/demo/scenarios` → `200`
+  - Confirmed the isolated benchmark backend still returns the expected `503` validation detail for `ai_4stage` without API keys; the frontend patch now routes that condition through the replay request path so the UI can show the real error instead of the generic SSE failure string.
+- Current live URLs/status:
+  - Isolated GitHub repo: https://github.com/Krishpotanwar/disasterman-scaler-demo — updated on `main` with commit `25cb1e0`.
+  - Isolated Hugging Face Space: https://krishpotanwar-disasterman-scaler-demo.hf.space — updated on `main` with commit `25cb1e0`.
+  - Isolated Vercel app: https://disasterman-scaler-demo.vercel.app — live on deployment `dpl_J824vzxhiU1TvfZ2pzuxiTLgaUe7`.
+- Known issues/open follow-ups:
+  - `ai_4stage` benchmark runs remain unavailable on the isolated backend until `GROQ_API_KEY` or `OPENAI_API_KEY` is configured there.
